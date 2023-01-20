@@ -14,7 +14,6 @@ object RangePartitionOn2ColumnsExample extends App {
     .config("spark.some.config.option", "some-value")
     .getOrCreate()
 
-
   val conf = spark.sparkContext.hadoopConfiguration
   val fs = org.apache.hadoop.fs.FileSystem.get(conf)
   fs.setVerifyChecksum(false)
@@ -38,29 +37,25 @@ object RangePartitionOn2ColumnsExample extends App {
     (22, "order 1013", 173d)
   ).toDF("id", "name", "amount")
 
-
   df.show()
 
-
-  val repart_df = df.repartitionByRange(3, $"id", $"amount").
-    withColumn("partition_id", spark_partition_id())
+  val repart_df = df.repartitionByRange(3, $"id", $"amount").withColumn("partition_id", spark_partition_id())
 
   repart_df.show()
-
 
   repart_df.write.mode(SaveMode.Overwrite).json("./output/range_part_people")
 
   repart_df.write.mode(SaveMode.Overwrite).parquet("./output/range_part_people")
 
-  val res = repart_df.mapPartitions(rows => {
-    val idsInPartition = rows.map(row => row.getAs[Int]("id"))
-      .toSeq.sorted.mkString(",")
-    Iterator(idsInPartition)
-  }).collect()
+  val res = repart_df
+    .mapPartitions(rows => {
+      val idsInPartition = rows.map(row => row.getAs[Int]("id")).toSeq.sorted.mkString(",")
+      Iterator(idsInPartition)
+    })
+    .collect()
 
   println(res.toSeq)
 
   // TimeUnit.MINUTES.sleep(10)
-
 
 }

@@ -1,5 +1,6 @@
 package com.andrew.repartition
 
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.spark_partition_id
 
 object RangePartitionExample extends App {
@@ -13,7 +14,6 @@ object RangePartitionExample extends App {
     .config("spark.some.config.option", "some-value")
     .getOrCreate()
 
-
   val conf = spark.sparkContext.hadoopConfiguration
   val fs = org.apache.hadoop.fs.FileSystem.get(conf)
   fs.setVerifyChecksum(false)
@@ -23,12 +23,9 @@ object RangePartitionExample extends App {
   // For implicit conversions from RDDs to DataFrames
   private val df = Seq(
     (10, "order 1001", 10d),
-
-
     (11, "order 1002", 240d),
     (11, "order 1001", 13d),
     (12, "order 1001", 12d),
-
     (12, "order 1003", 232d),
     (13, "order 1004", 100d),
     (13, "order 1001", 14d),
@@ -44,34 +41,33 @@ object RangePartitionExample extends App {
     (22, "order 1013", 173d),
     (22, "order 1013", 12d),
     (22, "order 1013", 14d),
-
     (10, "order 1001", 11d),
-    (10, "order 1001", 12d),
+    (10, "order 1001", 12d)
   ).toDF("id", "name", "amount")
-
 
   df.show()
 
-
-  val repart_df = df.repartitionByRange(3,  $"amount", $"id")
+  val repart_df = df
+    .repartitionByRange(3, $"id")
     .withColumn("partition_id", spark_partition_id())
 
   repart_df.show()
 
-
 //  repart_df.write.mode(SaveMode.Overwrite).json("./output/range_part_people")
 
-//  repart_df.write.mode(SaveMode.Overwrite).parquet("./output/range_part_people")
+  val savePath = "./output/range_part_people"
+  repart_df.write.mode(SaveMode.Overwrite).parquet(savePath)
 
-  val res = repart_df.mapPartitions(rows => {
-    val idsInPartition = rows.map(row => row.getAs[Int]("id"))
-      .toSeq.sorted.mkString(",")
-    Iterator(idsInPartition)
-  }).collect()
+  // collect all id in each partiitons
+  val res = repart_df
+    .mapPartitions(rows => {
+      val idsInPartition = rows.map(row => row.getAs[Int]("id")).toSeq.sorted.mkString(",")
+      Iterator(idsInPartition)
+    })
+    .collect()
 
-//  println(res.toSeq)
+  //  println(res.toSeq)
 
   // TimeUnit.MINUTES.sleep(10)
-
 
 }
